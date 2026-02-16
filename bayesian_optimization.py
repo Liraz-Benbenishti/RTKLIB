@@ -69,6 +69,41 @@ def run_trial_with_params(params, run, worker_id):
     print("Failed validation", score)
     return score
 
+
+import contextlib
+
+def validate_and_log_callback(study, trial):
+    # Check if current trial is the best
+    if trial.value != study.best_value:
+        return  # not the best, skip
+
+    # File to store validation results
+    log_file = "/app/optuna_best_trials.log"
+
+    # Validation inputs
+    validation_runs = [
+        "/app/day5/Peerez.obs",
+        "/app/day5/Naor5.obs",
+        "/app/day5/Thomas5.obs"
+    ]
+
+    # Redirec   t output to a file
+    with open(f"/app/output_{trial.number}.log", "w") as f:
+        with contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
+            f.write(f"\n=== Best Trial #{trial.number} ===\n")
+            f.write("Parameters:\n")
+            for k, v in trial.params.items():
+                f.write(f"{k} = {v}\n")
+
+            f.write("Validation scores:\n")
+            for run in validation_runs:
+                # Assuming run_trial_with_params returns a numeric score
+                score = run_trial_with_params(trial.params, run, worker_id=0)
+                f.write(f"{run} -> score: {score}\n")
+
+            f.write(f"Best value in study: {study.best_value}\n")
+            f.write("===========================\n")
+
 validated_best_trial = None
 validated_trial_params = None
 def validate_best_trial_callback(study: optuna.Study, trial: optuna.Trial, worker_id):
@@ -364,7 +399,7 @@ def worker(n_trials_per_worker, worker_id):
         # else:
         #     return 1000
 
-    study.optimize(objective, n_trials=n_trials_per_worker)
+    study.optimize(objective, n_trials=n_trials_per_worker, callbacks=[validate_and_log_callback])
 
 
 # -------------------------
