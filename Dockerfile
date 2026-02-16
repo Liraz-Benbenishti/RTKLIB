@@ -12,26 +12,6 @@ RUN apt-get install -y qtbase5-dev qtchooser
 # Project ERROR: Unknown module(s) in QT: serialport
 RUN apt-get install -y qtbase5-dev libqt5serialport5-dev
 
-COPY . /code
-WORKDIR /code
-RUN sed -i 's/\bNFREQ=3\b/NFREQ=4/g' RTKLib.pri
-RUN sed -i 's/\bNFREQ=3\b/NFREQ=4/g' CMakeLists.txt
-
-WORKDIR /code/app/consapp/rnx2rtkp/gcc
-
-RUN make -j$(nproc)
-
-WORKDIR /code/app/qtapp
-
-
-
-RUN qmake
-# /usr/bin/ld: /code/app/qtapp/../..//lib//libRTKLib.so: undefined reference to `gen_ally'
-#WORKDIR /code/src
-#RUN sed -i '67s|$| \n    rcv/allystar.c \\|' src.pro
-WORKDIR /code/app/qtapp
-RUN make -j$(nproc)
-RUN ./install_qtapp
 
 ############### PYTHON FOR BAYESIAN OPTIMIZATION ###############
 ENV DEBIAN_FRONTEND=noninteractive
@@ -60,5 +40,28 @@ RUN pip install optuna
 RUN pip install optuna-dashboard
 
 
+
+
+COPY . /code
+WORKDIR /code
+RUN sed -i 's/\bNFREQ=3\b/NFREQ=4/g' RTKLib.pri
+RUN sed -i 's/\bNFREQ=3\b/NFREQ=4/g' CMakeLists.txt
+
+WORKDIR /code/app/consapp/rnx2rtkp/gcc
+
+RUN make -j$(nproc)
+
+WORKDIR /code/app/qtapp
+
+RUN qmake
+# /usr/bin/ld: /code/app/qtapp/../..//lib//libRTKLib.so: undefined reference to `gen_ally'
+#WORKDIR /code/src
+#RUN sed -i '67s|$| \n    rcv/allystar.c \\|' src.pro
+WORKDIR /code/app/qtapp
+RUN make -j$(nproc)
+RUN ./install_qtapp
+
+
+RUN pip install psycopg2-binary
 
 CMD ["./rtkpost_qt/rtkpost_qt"]
