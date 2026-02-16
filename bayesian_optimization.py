@@ -159,6 +159,7 @@ def evaluate_solution():
 
 
 
+
 def snr_mask(trial, band, low, high):
     return ",".join(
         f"{trial.suggest_float(f'pos1-snrmask_{band}_{i}', low, high):.1f}"
@@ -178,7 +179,7 @@ def worker(n_trials_per_worker, worker_id):
     )
 
     study = optuna.load_study(
-        study_name="rtklib",
+        study_name="rtklib_tk2",
         storage=storage
     )
     def objective(trial):
@@ -349,7 +350,7 @@ def worker(n_trials_per_worker, worker_id):
 
         if params["pos1-snrmask_r"] == "on":
             params.update({
-                "pos1-snrmask_L1": snr_mask(trial, "L1", 20, 45),
+                "pos1-snrmask_L1": snr_mask(trial, "L1", 20, 45), 
                 "pos1-snrmask_L2": snr_mask(trial, "L2", 20, 40),
                 "pos1-snrmask_L5": snr_mask(trial, "L5", 15, 40),
                 "pos1-snrmask_L6": snr_mask(trial, "L6", 10, 35),
@@ -357,49 +358,38 @@ def worker(n_trials_per_worker, worker_id):
 
         write_config(params, worker_id)
         conf_file = f"/app/temp_conf_{worker_id}.conf"
-        output_pos_file = f"/app/test_{worker_id}.pos"
-        try:
-            result = subprocess.run(
-                f"/code/app/consapp/rnx2rtkp/gcc/rnx2rtkp -k {conf_file} -o {output_pos_file} /app/day5/dodge.obs /app/day5/base_72/log0122a.26o /app/day5/base_72/log0122a.26C /app/day5/base_72/log0122a.26G /app/day5/base_72/log0122a.26L /app/day5/base/log0122a.26N",
-                shell=True,
-                check=True,
-                capture_output=True,
-                text=True
-            )
+        # conf_file = f"/app/phones.conf"
 
-            # print("----- rnx2rtkp STDOUT -----")
-            # print(result.stdout)
-            # print("----- rnx2rtkp STDERR -----")
-            # print(result.stderr)
+        dodge_path = "/app/dodge.obs" # 5.1m
+        naor_path = "/app/Day5/proccessing/proccessing/naor5/Naor5.obs" # 5.4, 18.2m
+        perez_path = "/app/day5/Peerez.obs" # 1.8m, 10.5m
+        paths = [dodge_path, naor_path, perez_path]
+        sum_of_scores = 0
+
+        for path in paths:
+            output_pos_file = f"/app/test_{worker_id}.pos"
+            try:
+                result = subprocess.run(
+                    f"/code/app/consapp/rnx2rtkp/gcc/rnx2rtkp -k {conf_file} -o {output_pos_file} {path} /app/day5_dodge_raw/base_72/log0122a.26o /app/day5_dodge_raw/base_72/log0122a.26C /app/day5_dodge_raw/base_72/log0122a.26G /app/day5_dodge_raw/base_72/log0122a.26L /app/day5_dodge_raw/base_72/log0122a.26N",
+                    shell=True,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+
+            except subprocess.CalledProcessError as e:
+                print("RTK failed!")
+                return 3001
 
 
-        except subprocess.CalledProcessError as e:
-            print("RTK failed!")
-            # print("STDOUT:", e.stdout)
-            # print("STDERR:", e.stderr)
-            return 1000
-
-        score = run_synchronized_analysis(output_pos_file, "/app/log0122a.pos")
-        # print("trial.study.best_value", trial.study)
-        is_valid = True
-        # try: 
-        #     if score < trial.study.best_value:
-        #         print("HI")
-        #         is_valid = validate_best_trial_callback(trial.study, trial, worker_id)
-        # except:
-        #     pass
-        
-        # print("score", score, is_valid)
+            score = run_synchronized_analysis(output_pos_file, "/app/day5/rover/log0122a.pos")
+            sum_of_scores += score
         e = time.time()
         print(f"Total objective time: {e - s}")
 
-        return score
-        # if is_valid:
-        #     return score
-        # else:
-        #     return 1000
+        return sum_of_scores
 
-    study.optimize(objective, n_trials=n_trials_per_worker, callbacks=[validate_and_log_callback])
+    study.optimize(objective, n_trials=n_trials_per_worker) # , callbacks=[validate_and_log_callback])
 
 
 # -------------------------
@@ -412,7 +402,7 @@ def worker(n_trials_per_worker, worker_id):
 #         "-k", "/app/phones.conf",
 #         "-o", OUTPUT_POS,
 #         "/app/day5/dodge.obs",
-#         "/app/day5/base_72/log0122a.26o",
+#         "/app/day5_dodge_raw/base_72/log0122a.26o",
 #         "/app/day5/base_72/log0122a.26C",
 #         "/app/day5/base_72/log0122a.26G",
 #         "/app/day5/base_72/log0122a.26L",
@@ -491,7 +481,7 @@ storage = optuna.storages.RDBStorage(
 )
 
 study = optuna.create_study(
-    study_name="rtklib",
+    study_name="rtklib_tk2",
     storage=storage,
     load_if_exists=True,
     direction="minimize",
@@ -523,7 +513,7 @@ for p in processes:
 
 # Load final results
 study = optuna.load_study(
-    study_name="gnss_imu",
+    study_name="rtklib_tk2",
     storage="sqlite:///gnss_imu.db"
 )
 

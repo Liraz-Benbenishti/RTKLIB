@@ -73,7 +73,8 @@ def run_synchronized_analysis(phone_path, rover_path):
             return {'rmse': np.sqrt(np.mean(arr**2)), 's1': np.percentile(arr, 68.27), 's2': np.percentile(arr, 95.45), 'max': np.max(arr)}
 
         s_raw, s_filt, s_dyn = get_stats(err_raw), get_stats(df_p_s['err_filt']), get_stats(df_p_s['err_filt'][~is_static])
-
+        print("GT LENGTH:", len(df_r))
+        print("err_raw length", len(err_raw))
         print("SAVITZKY-GOLAY TRAJECTORY ANALYSIS")
         print("===============================================================================================")
         print("METRIC         | RAW GNSS      | FILTERED (S-G)| MOVING ONLY")
@@ -85,6 +86,9 @@ def run_synchronized_analysis(phone_path, rover_path):
         print("===============================================================================================")
 
         save_error_heatmap_kml(df_p_s.reset_index(), phone_path.replace(".pos", "_heatmap.kml"))
+        if len(err_raw) < len(df_r) * 0.965:
+            return 999
+
         return s_raw['s2']
     except:
         return 1000
