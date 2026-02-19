@@ -51,6 +51,10 @@ def run_synchronized_analysis(phone_path, rover_path):
         df_p = load_enhanced_data(phone_path)
         df_r = load_enhanced_data(rover_path)
         
+
+        print("lat", df_r["lat"].min(), df_r["lat"].max())
+        print("lon", df_r["lon"].min(), df_r["lon"].max())
+
         # Savitzky-Golay Smoothing
         df_p['final_e'] = savgol_filter(df_p['utm_e'].values, 11, 3)
         df_p['final_n'] = savgol_filter(df_p['utm_n'].values, 11, 3)
