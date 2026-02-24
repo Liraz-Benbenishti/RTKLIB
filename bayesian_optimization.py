@@ -192,27 +192,27 @@ def worker(n_trials_per_worker, worker_id):
             # ========================
 
             # Satellite elevation mask (deg)
-            "pos1-elmask": trial.suggest_float("pos1-elmask", 5, 25),
+            "pos1-elmask": trial.suggest_float("pos1-elmask", 5, 25, step=0.1),
 
             # SNR mask threshold (dB-Hz)
-            "pos1-snrmask": trial.suggest_float("pos1-snrmask", 0, 35),
+            "pos1-snrmask": trial.suggest_float("pos1-snrmask", 0, 35, step=0.1),
 
             # Navigation system selection
-            "pos1-navsys": trial.suggest_categorical(
+            "pos1-navsys": trial.suggest_int(
                 "pos1-navsys",
-                [1, 5, 13, 15, 45, 47, 61, 127]
+                1, 127
             ),
 
             # Ionosphere model
             "pos1-ionoopt": trial.suggest_categorical(
                 "pos1-ionoopt",
-                ["off", "brdc", "dual-freq", "est-stec", "ionex-tec"]
+                ["off", "brdc", "dual-freq", "est-stec", "ionex-tec", "sbas"]
             ),
 
             # Troposphere model
             "pos1-tropopt": trial.suggest_categorical(
                 "pos1-tropopt",
-                ["off", "saas", "est-ztd", "est-ztdgrad"]
+                ["off", "saas", "est-ztd", "est-ztdgrad", "ztd"]
             ),
 
             # Ephemeris type
@@ -244,7 +244,7 @@ def worker(n_trials_per_worker, worker_id):
             # ========================
 
             # AR elevation mask
-            "pos2-arelmask": trial.suggest_float("pos2-arelmask", 0, 25),
+            "pos2-arelmask": trial.suggest_float("pos2-arelmask", 0, 25, step=0.1),
 
             # AR mode
             "pos2-armode": trial.suggest_categorical(
@@ -253,16 +253,16 @@ def worker(n_trials_per_worker, worker_id):
             ),
 
             # Minimum AR ratio
-            "pos2-arthres": trial.suggest_float("pos2-arthres", 2.0, 5.0),
+            "pos2-arthres": trial.suggest_float("pos2-arthres", 2.0, 5.0, step=0.1),
 
             # Max variance allowed before AR attempt (m)
             "pos2-arthres1": trial.suggest_float("pos2-arthres1", 0.001, 1.0, log=True),
 
             # Cycle-slip threshold (m)
-            "pos2-slipthres": trial.suggest_float("pos2-slipthres", 0.02, 0.2),
+            "pos2-slipthres": trial.suggest_float("pos2-slipthres", 0.02, 0.2, step=0.001),
 
             # Doppler slip detection
-            "pos2-dopthres": trial.suggest_float("pos2-dopthres", 0, 10),
+            "pos2-dopthres": trial.suggest_float("pos2-dopthres", 0, 10, step=0.1),
 
             # Max differential age (sec)
             "pos2-maxage": trial.suggest_int("pos2-maxage", 5, 60),
@@ -301,7 +301,7 @@ def worker(n_trials_per_worker, worker_id):
 
             # Elevation-dependent phase error
             "stats-errphaseel": trial.suggest_float(
-                "stats-errphaseel", 0, 0.01
+                "stats-errphaseel", 0, 0.01, step=0.001
             ),
 
             # Doppler noise (Hz)
@@ -349,12 +349,22 @@ def worker(n_trials_per_worker, worker_id):
         )
 
         if params["pos1-snrmask_r"] == "on":
-            params.update({
-                "pos1-snrmask_L1": snr_mask(trial, "L1", 20, 45), 
-                "pos1-snrmask_L2": snr_mask(trial, "L2", 20, 40),
-                "pos1-snrmask_L5": snr_mask(trial, "L5", 15, 40),
-                "pos1-snrmask_L6": snr_mask(trial, "L6", 10, 35),
-            })
+            if "l1" in params["pos1-frequency"]:
+                params.update({
+                    "pos1-snrmask_L1": snr_mask(trial, "L1", 20, 45), 
+                })
+            if "l2" in params["pos1-frequency"]:
+                params.update({
+                    "pos1-snrmask_L2": snr_mask(trial, "L2", 20, 40),
+                })
+            if "l5" in params["pos1-frequency"]:
+                params.update({
+                    "pos1-snrmask_L5": snr_mask(trial, "L5", 15, 40),
+                })
+            if "l6" in params["pos1-frequency"]:
+                params.update({
+                    "pos1-snrmask_L6": snr_mask(trial, "L6", 10, 35),
+                })
 
         write_config(params, worker_id)
         conf_file = f"/app/temp_conf_{worker_id}.conf"
@@ -390,6 +400,16 @@ def worker(n_trials_per_worker, worker_id):
         return sum_of_scores
 
     study.optimize(objective, n_trials=n_trials_per_worker) # , callbacks=[validate_and_log_callback])
+
+# RTKLIB Solution Debug:
+# If most epochs are not Q=1, the problem is anbiguity resolution, not noise tuning.
+# Check AR statistics in trace.
+# Run rnx2rtkp with out-solstat = on, trace 3 or 4.
+# Look at AR ratio (validation ratio), NUmber of satellites used. Rejected satellites.  If ratio is low (<3), your AR settings are too aggressive or SNR mask too strict.
+# Check geometry - Bad DOP = bad fix.
+# PDOP, NUmber of satellites per constellation, Elevation distribution.
+# If you're masking too aggressively (snrmask or elmask), you may be killing geometry.
+# Maybe reject if fix ratio lower than 70%.
 
 
 # -------------------------
